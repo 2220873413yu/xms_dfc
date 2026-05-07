@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.SwapConfigMapper">
+
+    <resultMap type="SwapConfig" id="SwapConfigResult">
+        <result property="id"    column="id"    />
+        <result property="sourceCoinType"    column="source_coin_type"    />
+        <result property="sourceCoinCode"    column="source_coin_code"    />
+        <result property="targetCoinType"    column="target_coin_type"    />
+        <result property="targetCoinCode"    column="target_coin_code"    />
+        <result property="swapOpen"    column="swap_open"    />
+        <result property="swapPrice"    column="swap_price"    />
+        <result property="feeRatio"    column="fee_ratio"    />
+        <result property="minSwapAmount"    column="min_swap_amount"    />
+        <result property="maxSwapAmount"    column="max_swap_amount"    />
+        <result property="dailySwapLimit"    column="daily_swap_limit"    />
+        <result property="sortOrder"    column="sort_order"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectSwapConfigVo">
+        select id, source_coin_type, source_coin_code, target_coin_type, target_coin_code, swap_open, swap_price, fee_ratio, min_swap_amount, max_swap_amount, daily_swap_limit, sort_order, create_time, update_time, remark from t_swap_config
+    </sql>
+
+    <select id="selectSwapConfigList" parameterType="SwapConfig"
+            resultMap="SwapConfigResult">
+        <include refid="selectSwapConfigVo"/>
+        <where>
+            <if test="sourceCoinType != null "> and source_coin_type = #{sourceCoinType}</if>
+            <if test="sourceCoinCode != null  and sourceCoinCode != ''"> and source_coin_code = #{sourceCoinCode}</if>
+            <if test="targetCoinType != null "> and target_coin_type = #{targetCoinType}</if>
+            <if test="targetCoinCode != null  and targetCoinCode != ''"> and target_coin_code = #{targetCoinCode}</if>
+            <if test="swapOpen != null "> and swap_open = #{swapOpen}</if>
+            <if test="swapPrice != null "> and swap_price = #{swapPrice}</if>
+            <if test="feeRatio != null "> and fee_ratio = #{feeRatio}</if>
+            <if test="minSwapAmount != null "> and min_swap_amount = #{minSwapAmount}</if>
+            <if test="maxSwapAmount != null "> and max_swap_amount = #{maxSwapAmount}</if>
+            <if test="dailySwapLimit != null "> and daily_swap_limit = #{dailySwapLimit}</if>
+            <if test="sortOrder != null "> and sort_order = #{sortOrder}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

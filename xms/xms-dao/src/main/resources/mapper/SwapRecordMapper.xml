@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.SwapRecordMapper">
+
+    <resultMap type="SwapRecord" id="SwapRecordResult">
+        <result property="id"    column="id"    />
+        <result property="orderNo"    column="order_no"    />
+        <result property="userId"    column="user_id"    />
+        <result property="sourceCoinType"    column="source_coin_type"    />
+        <result property="targetCoinType"    column="target_coin_type"    />
+        <result property="sourceAmount"    column="source_amount"    />
+        <result property="swapPrice"    column="swap_price"    />
+        <result property="feeRatio"    column="fee_ratio"    />
+        <result property="feeAmount"    column="fee_amount"    />
+        <result property="targetNetAmount"    column="target_net_amount"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectSwapRecordVo">
+        select id, order_no, user_id, source_coin_type,target_coin_type, source_amount, swap_price, fee_ratio, fee_amount, target_net_amount, create_time, update_time, remark from t_swap_record
+    </sql>
+
+    <select id="selectSwapRecordList" parameterType="SwapRecord"
+            resultMap="SwapRecordResult">
+        <include refid="selectSwapRecordVo"/>
+        <where>
+            <if test="orderNo != null  and orderNo != ''"> and order_no = #{orderNo}</if>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="sourceCoinType != null "> and source_coin_type = #{sourceCoinType}</if>
+            <if test="targetCoinType != null "> and target_coin_type = #{targetCoinType}</if>
+            <if test="sourceAmount != null "> and source_amount = #{sourceAmount}</if>
+            <if test="swapPrice != null "> and swap_price = #{swapPrice}</if>
+            <if test="feeRatio != null "> and fee_ratio = #{feeRatio}</if>
+            <if test="feeAmount != null "> and fee_amount = #{feeAmount}</if>
+            <if test="targetNetAmount != null "> and target_net_amount = #{targetNetAmount}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xms.dao.mapper.StakeOrderMapper">
+
+    <resultMap type="StakeOrder" id="StakeOrderResult">
+        <result property="id"    column="id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="orderNo"    column="order_no"    />
+        <result property="quantity"    column="quantity"    />
+        <result property="stakeOortAmount"    column="stake_oort_amount"    />
+        <result property="extraValueUsdt"    column="extra_value_usdt"    />
+        <result property="oortPriceUsdt"    column="oort_price_usdt"    />
+        <result property="extraStakeOortAmount"    column="extra_stake_oort_amount"    />
+        <result property="dayReward"    column="day_reward"    />
+        <result property="totalYieldTarget"    column="total_yield_target"    />
+        <result property="yieldedAmount"    column="yielded_amount"    />
+        <result property="status"    column="status"    />
+        <result property="validDays"    column="valid_days"    />
+        <result property="haveDays"    column="have_days"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectStakeOrderVo">
+        select remark, id, user_id, order_no, quantity, stake_oort_amount, extra_value_usdt, oort_price_usdt, extra_stake_oort_amount, day_reward, total_yield_target, yielded_amount, status, valid_days, have_days, create_time, update_time from t_stake_order
+    </sql>
+
+    <select id="selectStakeOrderList" parameterType="StakeOrder"
+            resultMap="StakeOrderResult">
+        <include refid="selectStakeOrderVo"/>
+        <where>
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="orderNo != null  and orderNo != ''"> and order_no = #{orderNo}</if>
+            <if test="quantity != null "> and quantity = #{quantity}</if>
+            <if test="stakeOortAmount != null "> and stake_oort_amount = #{stakeOortAmount}</if>
+            <if test="extraValueUsdt != null "> and extra_value_usdt = #{extraValueUsdt}</if>
+            <if test="oortPriceUsdt != null "> and oort_price_usdt = #{oortPriceUsdt}</if>
+            <if test="extraStakeOortAmount != null "> and extra_stake_oort_amount = #{extraStakeOortAmount}</if>
+            <if test="dayReward != null "> and day_reward = #{dayReward}</if>
+            <if test="totalYieldTarget != null "> and total_yield_target = #{totalYieldTarget}</if>
+            <if test="yieldedAmount != null "> and yielded_amount = #{yieldedAmount}</if>
+            <if test="status != null "> and status = #{status}</if>
+            <if test="validDays != null "> and valid_days = #{validDays}</if>
+            <if test="haveDays != null "> and have_days = #{haveDays}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != '' and params.endCreateTime != null and params.endCreateTime != ''"> and create_time between #{params.beginCreateTime} and #{params.endCreateTime}</if>
+        </where>
+        order by id desc
+    </select>
+
+</mapper>

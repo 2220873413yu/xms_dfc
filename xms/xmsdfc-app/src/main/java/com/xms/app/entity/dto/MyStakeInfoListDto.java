@@ -19,8 +19,11 @@ import java.util.Date;
 public class MyStakeInfoListDto {
 	/** 主键id */
 	private Long id;
+	private Integer coinType;
+	private Integer rewardCoinType;
 	/** 购买份数 */
 	private Integer quantity;
+	private BigDecimal stakeAmount;
 	/**
 	 * 固定质押OORT数量
 	 */
@@ -31,6 +34,7 @@ public class MyStakeInfoListDto {
 
 	/** 每日产出OORT=product.day_reward*quantity */
 	private BigDecimal dayReward;
+	private Integer linearDays;
 
 	/** 剩余有效期天数 */
 	private Integer haveDays;

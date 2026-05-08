@@ -45,7 +45,7 @@ public class UserMoney {
 	@Excel(name = "USDT", sort = 2)
     private BigDecimal validNum1;
 	/**
-	 * DFC
+	 * 可用DFC：DFC质押下单扣款、本金到期退还都走该字段。
 	 */
 	@Excel(name = "DFC", sort = 3)
     private BigDecimal validNum2;
@@ -62,7 +62,7 @@ public class UserMoney {
     private BigDecimal validNum4;
 
 	/**
-	 * 产出DFC(挖矿静态产出的dfc)
+	 * 产出DFC：DFC质押每日产出、矿机静态产出的DFC都走该字段。
 	 */
 	@Excel(name = "产出DFC", sort = 6)
     private BigDecimal validNum5;

@@ -73,6 +73,7 @@ public abstract class AbstractDiyCanalClient implements CanalClient {
 					connector.ack(batchId);
 				}
 			} catch (Exception e) {
+				e.printStackTrace();
 				log.warn("单机版的 failed to connect after retry  times {}", times);
 				times = times + 1;
 				if (times >= retryTimes) {

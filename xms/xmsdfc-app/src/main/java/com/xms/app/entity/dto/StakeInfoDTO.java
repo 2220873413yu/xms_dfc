@@ -18,14 +18,18 @@ public class StakeInfoDTO {
 
 	/** 主键id */
 	private Long id;
+	private Integer coinType;
+	private Integer rewardCoinType;
 	/** 销量 */
 	private Integer sales;
+	private Integer availableStock;
 	/** 质押价格 */
 	private BigDecimal stakeUnitAmount;
 	/** 额外需要质押的USDT等值金额(按价格换算为OORT) */
 	private BigDecimal extraStakeValueUsdt;
 	/** 每天产出 */
 	private BigDecimal dayReward;
+	private Integer linearDays;
 	/** 订单有效期(天)，如360 */
 	private Integer validDays;
 }

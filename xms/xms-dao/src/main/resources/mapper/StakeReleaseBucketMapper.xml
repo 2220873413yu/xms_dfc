@@ -7,6 +7,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <resultMap type="StakeReleaseBucket" id="StakeReleaseBucketResult">
         <result property="id"    column="id"    />
         <result property="userId"    column="user_id"    />
+        <result property="coinType"    column="coin_type"    />
         <result property="linearDays"    column="linear_days"    />
         <result property="totalAmount"    column="total_amount"    />
         <result property="remainingAmount"    column="remaining_amount"    />
@@ -23,7 +24,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectStakeReleaseBucketVo">
-        select remark, order_no, daily_release_amount, have_days, id, user_id, linear_days, total_amount, remaining_amount, status, start_time, last_release_time, create_time, update_time, source_snapshot from t_stake_release_bucket
+        select remark, order_no, daily_release_amount, have_days, id, user_id, coin_type, linear_days,
+               total_amount, remaining_amount, status, start_time, last_release_time, create_time, update_time, source_snapshot
+        from t_stake_release_bucket
     </sql>
 
     <select id="selectStakeReleaseBucketList" parameterType="StakeReleaseBucket"
@@ -31,6 +34,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <include refid="selectStakeReleaseBucketVo"/>
         <where>
             <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="coinType != null "> and coin_type = #{coinType}</if>
             <if test="orderNo != null "> and order_no = #{orderNo}</if>
             <if test="linearDays != null "> and linear_days = #{linearDays}</if>
             <if test="totalAmount != null "> and total_amount = #{totalAmount}</if>

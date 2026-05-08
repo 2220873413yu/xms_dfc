@@ -19,6 +19,7 @@ import java.util.Date;
 public class MyReleaseBucketListDto {
 	/** 主键id */
 	private Long id;
+	private Integer coinType;
 	/** 桶内剩余天数 */
 	private Integer haveDays;
 	/** 桶内累计应线性释放总量 */

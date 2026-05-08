@@ -16,7 +16,7 @@ public interface BizStakeService {
 	 * 获取质押信息 没有上架的话可能为空
 	 * @return
 	 */
-	StakeInfoDTO stakeInfo();
+	StakeInfoDTO stakeInfo(Integer coinType);
 
 	/**
 	 * 质押
@@ -28,19 +28,19 @@ public interface BizStakeService {
 	 * 我的质押信息
 	 * @return
 	 */
-	MyStakeInfoDto myStakeInfo();
+	MyStakeInfoDto myStakeInfo(Integer coinType);
 
 	/**
 	 * 质押订单列表
 	 * @param lastId
 	 * @return
 	 */
-	List<MyStakeInfoListDto> destroyOrderList(Long lastId);
+	List<MyStakeInfoListDto> destroyOrderList(Long lastId, Integer coinType);
 
 	/**
 	 * 锁仓订单列表
 	 * @param lastId
 	 * @return
 	 */
-	List<MyReleaseBucketListDto> myReleaseBucketList(Long lastId);
+	List<MyReleaseBucketListDto> myReleaseBucketList(Long lastId, Integer coinType);
 }

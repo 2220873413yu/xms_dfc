@@ -10,7 +10,7 @@ import lombok.Data;
 @Data
 public class CreateStakeOrderVo {
 	/**
-	 * 矿机id
+	 * 质押套餐id
 	 */
 	@NotNull
 	private Long id;

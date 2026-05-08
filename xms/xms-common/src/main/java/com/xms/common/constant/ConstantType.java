@@ -59,12 +59,12 @@ public class ConstantType {
 	}
 
 	/**
-	 *
+	 * 奖励记录来源类型
 	 * 1:矿机收益,2:平台管理费,3:服务中心费,4:矿机管理费奖励直推,5:矿机管理费间推奖励,
 	 * 6:管理费极差奖励,7:管理费全国代理平级奖,8:oort质押立即释放,9:oort线性释放,
 	 * 10:购买矿机直推奖励,11:购买矿机间推奖励,12:市代均分奖励,13:省代均分奖励,
-	 * 14:全国代均分奖励,15:质押直推奖励,16:质押间推奖励
-	 *
+	 * 14:全国代均分奖励,15:质押直推奖励,16:质押间推奖励,
+	 * 17-26:历史业务类型,27:DFC质押立即释放,28:DFC质押线性释放,29:DFC质押本金退还
 	 */
 	public class xms_reward_record_source_type{
 		public static final int type_1 = 1;
@@ -93,6 +93,9 @@ public class ConstantType {
 		public static final int type_24 = 24;
 		public static final int type_25 = 25;
 		public static final int type_26 = 26;
+		public static final int type_27 = 27;
+		public static final int type_28 = 28;
+		public static final int type_29 = 29;
 	}
 
 	/**
@@ -122,8 +125,8 @@ public class ConstantType {
 	 * 1.充值,2:转账扣款,3:转账接收,4:提现,5:提现驳回,6:购买矿机,7:df划转,8:购买矿机直推奖励,9:购买矿机间推奖励
 	 * 10:市代均分奖励,11:省代均分奖励,12:全国代均分奖励,13:质押,14:质押直推奖励,15:质押间推奖励,
 	 * 16:矿机奖励,17:服务中心费,18:管理费直推奖励,19:管理费间推奖励,20:管理费极差奖励,21:质押扣款(oort),
-	 * 22:oort立即释放,23:oort线性释放,24:管理费平级奖励,25:管理费全国代理平级奖,26:闪兑扣除,27:闪兑增加,99:系统扣除
-	 * 28:平台拨扣
+	 * 22:oort立即释放,23:oort线性释放,24:管理费平级奖励,25:管理费全国代理平级奖,26:闪兑扣除,27:闪兑增加,28:平台拨扣,
+	 * 29/30/32:历史业务预留,33:DFC质押扣款,34:DFC质押立即释放,35:DFC质押线性释放,36:DFC质押本金退还,44:历史业务预留,99:系统扣除
 	 */
 	public class user_money_log_source_type{
 		public static final int type_99 = 99;
@@ -159,6 +162,10 @@ public class ConstantType {
 		public static final int type_29 = 29;
 		public static final int type_30 = 30;
 		public static final int type_32 = 32;
+		public static final int type_33 = 33;
+		public static final int type_34 = 34;
+		public static final int type_35 = 35;
+		public static final int type_36 = 36;
 		public static final int type_44 = 44;
 	}
 

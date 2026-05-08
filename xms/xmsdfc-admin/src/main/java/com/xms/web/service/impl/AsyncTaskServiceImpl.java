@@ -75,6 +75,8 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 
 	private static final String SQL_VALID_NUM5 = "UPDATE t_user_money SET update_time=?,gt_id=?,valid_num5=valid_num5+?,source_code=?,source_type=?,source_id=? WHERE id=? ";
 	private static final String SQL_UPDATE_AWAITING_AMOUNT = "UPDATE t_mining_package_order SET awaiting_amount = awaiting_amount + ? WHERE id = ?";
+	private static final BigDecimal STAKE_IMMEDIATE_RATIO = new BigDecimal("25");
+	private static final BigDecimal STAKE_LINEAR_RATIO = new BigDecimal("75");
 	private final AsyncTaskMapper asyncTaskMapper;
 	private final JdbcTemplate jdbcTemplate;
 	private final RenegadeStreamTemplate redisTemplate;
@@ -424,151 +426,138 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 	@Transactional(rollbackFor = Exception.class)
 	public void distributePtbInterest101() {
 		String strDate = DateUtil.format(DateUtil.date(), "yyyyMMdd");
-		//long类型日期
 		long currentDate = Long.parseLong(strDate);
 
 		Map<String, Object> task = getTask(SysConstant.TSK_TYPE_101, currentDate + "");
 		if (!CollectionUtil.isEmpty(task)) {
-			log.debug("每日矿发放矿机奖励任务已存在跳过");
+			log.debug("stake reward task already exists, skip");
 			return;
 		}
 
-		//线性释放订单奖励
 		stakeReleaseBucketService.lambdaUpdate()
-				.eq(StakeReleaseBucket::getStatus,0)
-				.gt(StakeReleaseBucket::getHaveDays,0)
-				.setSql("have_days = have_days - 1")
-				.update();
+			.eq(StakeReleaseBucket::getStatus, 0)
+			.gt(StakeReleaseBucket::getHaveDays, 0)
+			.setSql("have_days = have_days - 1")
+			.update();
 
 		List<StakeReleaseBucket> releaseBucketList = stakeReleaseBucketService.lambdaQuery()
 			.eq(StakeReleaseBucket::getStatus, 0)
-				.list();
-		if(CollectionUtil.isNotEmpty(releaseBucketList)){
-			//执行释放线性订单奖金记录
+			.list();
+		if (CollectionUtil.isNotEmpty(releaseBucketList)) {
 			doReleaseBucketList(releaseBucketList);
 		}
 
-		//质押奖励记录
 		stakeOrderService.lambdaUpdate()
-			.eq(StakeOrder::getStatus,0)
-			.gt(StakeOrder::getHaveDays,0)
+			.eq(StakeOrder::getStatus, 0)
+			.gt(StakeOrder::getHaveDays, 0)
 			.setSql("have_days = have_days - 1 ")
 			.update();
-		//查找
+
 		List<StakeOrder> stakeOrderList = stakeOrderService.lambdaQuery()
 			.eq(StakeOrder::getStatus, 0)
-				.list();
-		if(CollectionUtil.isNotEmpty(stakeOrderList)){
-			//释放比例
-			BigDecimal ratio = new BigDecimal("0.25");
+			.list();
+		if (CollectionUtil.isNotEmpty(stakeOrderList)) {
 			Integer currentDateInt = Integer.parseInt(strDate);
 			List<RewardRecord> rewardRecordList = new ArrayList<>(stakeOrderList.size());
 			List<UserMoney> userMoneyValidNum3List = new ArrayList<>(stakeOrderList.size() > 1000 ? 1000 : stakeOrderList.size());
+			List<UserMoney> userMoneyValidNum5List = new ArrayList<>(stakeOrderList.size() > 1000 ? 1000 : stakeOrderList.size());
 			List<Long> finishStakeOrderIds = new ArrayList<>();
+			List<StakeOrder> refundStakeOrderList = new ArrayList<>();
 			List<StakeOrder> updateStakeOrderList = new ArrayList<>(stakeOrderList.size());
 			int batchSize = 1000;
 			int stakeCount = 0;
 			List<StakeReleaseBucket> bucketList = new ArrayList<>(stakeOrderList.size());
-			Map<Long, BigDecimal> userBucketAddMap = new HashMap<>();
-			Map<Long, StringBuilder> userBucketSnapshotMap = new HashMap<>();
+
 			for (StakeOrder stakeOrder : stakeOrderList) {
 				if (stakeOrder.getHaveDays() == 0) {
 					finishStakeOrderIds.add(stakeOrder.getId());
+					if (Integer.valueOf(ConstantType.user_money_coin_type.type_2).equals(stakeOrder.getCoinType())
+						&& !Integer.valueOf(1).equals(stakeOrder.getPrincipalRefundStatus())) {
+						refundStakeOrderList.add(stakeOrder);
+					}
 				}
+
+				Integer rewardCoinType = stakeOrder.getRewardCoinType() == null
+					? ConstantType.user_money_coin_type.type_3
+					: stakeOrder.getRewardCoinType();
+				// 当前需求固定为 25% 立即释放、75% 线性释放，不再读取订单上的比例字段。
+				BigDecimal immediateReleasePercent = STAKE_IMMEDIATE_RATIO;
+				BigDecimal linearReleasePercent = STAKE_LINEAR_RATIO;
+				Integer linearDays = stakeOrder.getLinearDays() == null || stakeOrder.getLinearDays() <= 0
+					? 270
+					: stakeOrder.getLinearDays();
 				BigDecimal currentYielded = stakeOrder.getYieldedAmount() == null
 					? BigDecimal.ZERO
 					: stakeOrder.getYieldedAmount();
+				BigDecimal dayReward = stakeOrder.getDayReward() == null ? BigDecimal.ZERO : stakeOrder.getDayReward();
+
 				StakeOrder updateOrder = new StakeOrder();
 				updateOrder.setId(stakeOrder.getId());
-				updateOrder.setYieldedAmount(currentYielded.add(stakeOrder.getDayReward()));
+				updateOrder.setYieldedAmount(currentYielded.add(dayReward));
 				updateOrder.setUpdateTime(new Date());
 				updateStakeOrderList.add(updateOrder);
-				//立即释放金额
-				BigDecimal useReward = stakeOrder.getDayReward().multiply(ratio)
-						.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
-				//锁仓金额
-				BigDecimal releaseBucket = stakeOrder.getDayReward().subtract(useReward);
 
-				// 25% 立即释放：奖金记录 + 钱包流水（OORT）
+				BigDecimal useReward = dayReward.multiply(immediateReleasePercent)
+					.divide(SysConstant.BAIFENBI, ConstantStatic.newScale, ConstantStatic.roundingModeNew)
+					.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+				BigDecimal releaseBucket = dayReward.multiply(linearReleasePercent)
+					.divide(SysConstant.BAIFENBI, ConstantStatic.newScale, ConstantStatic.roundingModeNew)
+					.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
+
 				if (useReward.compareTo(BigDecimal.ZERO) > 0) {
 					RewardRecord rewardRecord = new RewardRecord();
 					rewardRecord.setOrderCode(IDUtils.getSnowflakeStr());
 					rewardRecord.setUserId(stakeOrder.getUserId());
 					rewardRecord.setAmount(useReward);
-					rewardRecord.setCoinType(ConstantType.user_money_coin_type.type_3);
-					rewardRecord.setSourceType(ConstantType.xms_reward_record_source_type.type_8);
+					rewardRecord.setCoinType(rewardCoinType);
+					rewardRecord.setSourceType(getStakeImmediateRewardSourceType(rewardCoinType));
 					rewardRecord.setSourceOrderCode(stakeOrder.getOrderNo());
 					rewardRecord.setSourceUserId(stakeOrder.getUserId());
 					rewardRecord.setCreateTime(new Date());
 					rewardRecordList.add(rewardRecord);
 
-								UserMoney entity = new UserMoney();
+					UserMoney entity = new UserMoney();
 					entity.setId(stakeOrder.getUserId());
-					entity.setValidNum3(useReward);
-								entity.setGtId(IDUtils.getSnowflakeStr());
+					setRewardMoneyField(entity, rewardCoinType, useReward);
+					entity.setGtId(IDUtils.getSnowflakeStr());
 					entity.setSourceCode(stakeOrder.getOrderNo());
 					entity.setSourceId(stakeOrder.getUserId());
-					entity.setSourceType(ConstantType.user_money_log_source_type.type_22);
-								entity.setUpdateTime(new Date());
-					userMoneyValidNum3List.add(entity);
+					entity.setSourceType(getStakeImmediateMoneySourceType(rewardCoinType));
+					entity.setUpdateTime(new Date());
+					addRewardMoney(userMoneyValidNum3List, userMoneyValidNum5List, rewardCoinType, entity);
 					stakeCount++;
 					if (stakeCount >= batchSize) {
-						bachUpdateMoneyValid3(userMoneyValidNum3List);
-						userMoneyValidNum3List.clear();
-						log.info("立即释放钱包更新成功");
+						flushStakeRewardMoney(userMoneyValidNum3List, userMoneyValidNum5List);
+						log.info("stake immediate reward wallet updated");
 						stakeCount = 0;
 					}
 				}
 
-				// 75% 进入线性释放桶（按用户汇总）
 				if (releaseBucket.compareTo(BigDecimal.ZERO) > 0) {
-					userBucketAddMap.merge(stakeOrder.getUserId(), releaseBucket, BigDecimal::add);
-					StringBuilder snapshot = userBucketSnapshotMap.computeIfAbsent(stakeOrder.getUserId(), k -> new StringBuilder());
-					if (snapshot.length() > 0) {
-						snapshot.append(",");
-					}
-					snapshot.append("{\"orderNo\":\"")
-						.append(stakeOrder.getOrderNo())
-						.append("\",\"orderRemainDays\":")
-						.append(stakeOrder.getHaveDays())
-						.append(",\"todayLinearAmount\":\"")
-						.append(releaseBucket.stripTrailingZeros().toPlainString())
-						.append("\"}");
-				}
-							}
-
-							if (CollectionUtil.isNotEmpty(rewardRecordList)) {
-								rewardRecordService.saveBatch(rewardRecordList);
-							}
-			if (CollectionUtil.isNotEmpty(userMoneyValidNum3List)) {
-				bachUpdateMoneyValid3(userMoneyValidNum3List);
-			}
-
-			// 仅新增桶（用户有新订单时创建）
-			if (CollectionUtil.isNotEmpty(userBucketAddMap)) {
-				BigDecimal b270 = new BigDecimal("270");
-				for (Map.Entry<Long, BigDecimal> entry : userBucketAddMap.entrySet()) {
-					Long userId = entry.getKey();
-					BigDecimal addAmount = entry.getValue();
-					String snapshotBody = userBucketSnapshotMap.get(userId) == null ? "" : userBucketSnapshotMap.get(userId).toString();
 					StakeReleaseBucket bucket = new StakeReleaseBucket();
-					bucket.setUserId(userId);
+					bucket.setUserId(stakeOrder.getUserId());
+					bucket.setCoinType(rewardCoinType);
 					bucket.setOrderNo(IDUtils.getSnowflakeStr());
-					bucket.setLinearDays(270);
-					bucket.setHaveDays(270);
-					bucket.setTotalAmount(addAmount);
-					bucket.setDailyReleaseAmount(addAmount.divide(b270, ConstantStatic.newScale, ConstantStatic.roundingModeNew));
-					bucket.setRemainingAmount(addAmount);
+					bucket.setLinearDays(linearDays);
+					bucket.setHaveDays(linearDays);
+					bucket.setTotalAmount(releaseBucket);
+					bucket.setDailyReleaseAmount(releaseBucket.divide(new BigDecimal(linearDays), ConstantStatic.newScale, ConstantStatic.roundingModeNew));
+					bucket.setRemainingAmount(releaseBucket);
 					bucket.setStatus(0);
 					bucket.setStartTime(currentDateInt);
-					//bucket.setLastReleaseTime(currentDateInt);
-					bucket.setSourceSnapshot("[" + snapshotBody + "]");
+					bucket.setSourceSnapshot("[{\"orderNo\":\"" + stakeOrder.getOrderNo()
+						+ "\",\"orderRemainDays\":" + stakeOrder.getHaveDays()
+						+ ",\"todayLinearAmount\":\"" + releaseBucket.stripTrailingZeros().toPlainString() + "\"}]");
 					bucket.setCreateTime(new Date());
 					bucketList.add(bucket);
 				}
 			}
 
-			if(CollectionUtil.isNotEmpty(bucketList)){
+			if (CollectionUtil.isNotEmpty(rewardRecordList)) {
+				rewardRecordService.saveBatch(rewardRecordList);
+			}
+			flushStakeRewardMoney(userMoneyValidNum3List, userMoneyValidNum5List);
+			if (CollectionUtil.isNotEmpty(bucketList)) {
 				stakeReleaseBucketService.saveBatch(bucketList);
 			}
 			if (CollectionUtil.isNotEmpty(updateStakeOrderList)) {
@@ -580,104 +569,188 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 					.set(StakeOrder::getStatus, 1)
 					.update();
 			}
-
+			refundDfcStakePrincipal(refundStakeOrderList);
 		}
-
-		//更新质押订单释放中但是天数为0的结束掉
-		/*stakeOrderService.lambdaUpdate()
-			.eq(StakeOrder::getStatus,0)
-			.le(StakeOrder::getHaveDays,0)
-			.set(StakeOrder::getStatus,1)
-			.update();*/
 
 		int i = addTask(SysConstant.TSK_TYPE_101, currentDate + "");
 		if (i != 1) {
-			throw new RuntimeException("添加任务类型101:每日计算动态+静态奖励失败");
+			throw new RuntimeException("add task type 101 failed");
 		}
 	}
 
-	private  void doReleaseBucketList(List<StakeReleaseBucket> releaseBucketList) {
- 		List<RewardRecord> rewardRecordList = new ArrayList<>(releaseBucketList.size());
- 		List<UserMoney> userMoneyValidNum3List = new ArrayList<>(releaseBucketList.size() > 1000 ? 1000 : releaseBucketList.size());
- 		List<StakeReleaseBucket> updateBucketList = new ArrayList<>(releaseBucketList.size());
- 		List<Long> finishBucketIds = new ArrayList<>();
- 		int batchSize = 1000;
- 		int stakeCount = 0;
+	private void doReleaseBucketList(List<StakeReleaseBucket> releaseBucketList) {
+		List<RewardRecord> rewardRecordList = new ArrayList<>(releaseBucketList.size());
+		List<UserMoney> userMoneyValidNum3List = new ArrayList<>(releaseBucketList.size() > 1000 ? 1000 : releaseBucketList.size());
+		List<UserMoney> userMoneyValidNum5List = new ArrayList<>(releaseBucketList.size() > 1000 ? 1000 : releaseBucketList.size());
+		List<StakeReleaseBucket> updateBucketList = new ArrayList<>(releaseBucketList.size());
+		List<Long> finishBucketIds = new ArrayList<>();
+		int batchSize = 1000;
+		int stakeCount = 0;
 		for (StakeReleaseBucket stakeReleaseBucket : releaseBucketList) {
-			//每日的奖励
- 			BigDecimal dailyReleaseAmount = stakeReleaseBucket.getDailyReleaseAmount();
- 			if (dailyReleaseAmount == null || dailyReleaseAmount.compareTo(BigDecimal.ZERO) <= 0) {
+			BigDecimal dailyReleaseAmount = stakeReleaseBucket.getDailyReleaseAmount();
+			if (dailyReleaseAmount == null || dailyReleaseAmount.compareTo(BigDecimal.ZERO) <= 0) {
 				continue;
 			}
- 			Integer haveDays = stakeReleaseBucket.getHaveDays();
- 			BigDecimal remainingAmount = stakeReleaseBucket.getRemainingAmount() == null
- 				? BigDecimal.ZERO
- 				: stakeReleaseBucket.getRemainingAmount();
- 			if (remainingAmount.compareTo(BigDecimal.ZERO) <= 0) {
- 				finishBucketIds.add(stakeReleaseBucket.getId());
+			Integer rewardCoinType = stakeReleaseBucket.getCoinType() == null
+				? ConstantType.user_money_coin_type.type_3
+				: stakeReleaseBucket.getCoinType();
+			Integer haveDays = stakeReleaseBucket.getHaveDays();
+			BigDecimal remainingAmount = stakeReleaseBucket.getRemainingAmount() == null
+				? BigDecimal.ZERO
+				: stakeReleaseBucket.getRemainingAmount();
+			if (remainingAmount.compareTo(BigDecimal.ZERO) <= 0) {
+				finishBucketIds.add(stakeReleaseBucket.getId());
 				continue;
 			}
- 			// 最后一天(haveDays == 0) 释放剩余全部，否则按日释放
- 			BigDecimal releaseAmount = haveDays == 0
- 				? remainingAmount
- 				: dailyReleaseAmount.min(remainingAmount);
- 			if (releaseAmount.compareTo(BigDecimal.ZERO) <= 0) {
- 				continue;
- 			}
- 			stakeReleaseBucket.setRemainingAmount(remainingAmount.subtract(releaseAmount));
- 			stakeReleaseBucket.setUpdateTime(new Date());
- 			updateBucketList.add(stakeReleaseBucket);
- 			if (stakeReleaseBucket.getRemainingAmount().compareTo(BigDecimal.ZERO) <= 0) {
- 				finishBucketIds.add(stakeReleaseBucket.getId());
- 			}
+			BigDecimal releaseAmount = haveDays == 0
+				? remainingAmount
+				: dailyReleaseAmount.min(remainingAmount);
+			if (releaseAmount.compareTo(BigDecimal.ZERO) <= 0) {
+				continue;
+			}
+			stakeReleaseBucket.setRemainingAmount(remainingAmount.subtract(releaseAmount));
+			stakeReleaseBucket.setUpdateTime(new Date());
+			updateBucketList.add(stakeReleaseBucket);
+			if (stakeReleaseBucket.getRemainingAmount().compareTo(BigDecimal.ZERO) <= 0) {
+				finishBucketIds.add(stakeReleaseBucket.getId());
+			}
 
- 			RewardRecord rewardRecord = new RewardRecord();
- 			rewardRecord.setOrderCode(IDUtils.getSnowflakeStr());
- 			rewardRecord.setUserId(stakeReleaseBucket.getUserId());
+			RewardRecord rewardRecord = new RewardRecord();
+			rewardRecord.setOrderCode(IDUtils.getSnowflakeStr());
+			rewardRecord.setUserId(stakeReleaseBucket.getUserId());
 			rewardRecord.setAmount(releaseAmount);
-			rewardRecord.setCoinType(ConstantType.user_money_coin_type.type_3);
-			rewardRecord.setSourceType(ConstantType.xms_reward_record_source_type.type_9);
- 			rewardRecord.setSourceOrderCode(stakeReleaseBucket.getOrderNo());
- 			rewardRecord.setSourceUserId(stakeReleaseBucket.getUserId());
- 			rewardRecord.setCreateTime(new Date());
- 			rewardRecordList.add(rewardRecord);
+			rewardRecord.setCoinType(rewardCoinType);
+			rewardRecord.setSourceType(getStakeLinearRewardSourceType(rewardCoinType));
+			rewardRecord.setSourceOrderCode(stakeReleaseBucket.getOrderNo());
+			rewardRecord.setSourceUserId(stakeReleaseBucket.getUserId());
+			rewardRecord.setCreateTime(new Date());
+			rewardRecordList.add(rewardRecord);
 
- 			UserMoney entity = new UserMoney();
- 			entity.setId(stakeReleaseBucket.getUserId());
-			entity.setValidNum3(releaseAmount);
- 			entity.setGtId(IDUtils.getSnowflakeStr());
- 			entity.setSourceCode(stakeReleaseBucket.getOrderNo());
- 			entity.setSourceId(stakeReleaseBucket.getUserId());
-			entity.setSourceType(ConstantType.user_money_log_source_type.type_23);
- 			entity.setUpdateTime(new Date());
- 			userMoneyValidNum3List.add(entity);
- 			stakeCount++;
- 			if (stakeCount >= batchSize) {
- 				bachUpdateMoneyValid3(userMoneyValidNum3List);
- 				userMoneyValidNum3List.clear();
- 				log.info("线性释放钱包更新成功");
- 				stakeCount = 0;
- 			}
+			UserMoney entity = new UserMoney();
+			entity.setId(stakeReleaseBucket.getUserId());
+			setRewardMoneyField(entity, rewardCoinType, releaseAmount);
+			entity.setGtId(IDUtils.getSnowflakeStr());
+			entity.setSourceCode(stakeReleaseBucket.getOrderNo());
+			entity.setSourceId(stakeReleaseBucket.getUserId());
+			entity.setSourceType(getStakeLinearMoneySourceType(rewardCoinType));
+			entity.setUpdateTime(new Date());
+			addRewardMoney(userMoneyValidNum3List, userMoneyValidNum5List, rewardCoinType, entity);
+			stakeCount++;
+			if (stakeCount >= batchSize) {
+				flushStakeRewardMoney(userMoneyValidNum3List, userMoneyValidNum5List);
+				log.info("stake linear reward wallet updated");
+				stakeCount = 0;
+			}
 		}
 
- 		if (CollectionUtil.isNotEmpty(rewardRecordList)) {
- 			rewardRecordService.saveBatch(rewardRecordList);
- 		}
- 		if (CollectionUtil.isNotEmpty(userMoneyValidNum3List)) {
- 			bachUpdateMoneyValid3(userMoneyValidNum3List);
- 		}
- 		if (CollectionUtil.isNotEmpty(updateBucketList)) {
- 			stakeReleaseBucketService.updateBatchById(updateBucketList);
- 		}
-
-		 //关单
- 		if (CollectionUtil.isNotEmpty(finishBucketIds)) {
- 			stakeReleaseBucketService.lambdaUpdate()
- 				.in(StakeReleaseBucket::getId, finishBucketIds)
-				.eq(StakeReleaseBucket::getStatus,0)
+		if (CollectionUtil.isNotEmpty(rewardRecordList)) {
+			rewardRecordService.saveBatch(rewardRecordList);
+		}
+		flushStakeRewardMoney(userMoneyValidNum3List, userMoneyValidNum5List);
+		if (CollectionUtil.isNotEmpty(updateBucketList)) {
+			stakeReleaseBucketService.updateBatchById(updateBucketList);
+		}
+		if (CollectionUtil.isNotEmpty(finishBucketIds)) {
+			stakeReleaseBucketService.lambdaUpdate()
+				.in(StakeReleaseBucket::getId, finishBucketIds)
+				.eq(StakeReleaseBucket::getStatus, 0)
 				.set(StakeReleaseBucket::getStatus, 1)
- 				.update();
- 		}
+				.update();
+		}
+	}
+
+	private void setRewardMoneyField(UserMoney entity, Integer coinType, BigDecimal amount) {
+		// DFC质押产出使用“产出DFC”(valid_num5)；OORT产出保持原钱包字段(valid_num3)。
+		if (Integer.valueOf(ConstantType.user_money_coin_type.type_5).equals(coinType)) {
+			entity.setValidNum5(amount);
+		} else {
+			entity.setValidNum3(amount);
+		}
+	}
+
+	private void addRewardMoney(List<UserMoney> validNum3List, List<UserMoney> validNum5List, Integer coinType, UserMoney entity) {
+		if (Integer.valueOf(ConstantType.user_money_coin_type.type_5).equals(coinType)) {
+			validNum5List.add(entity);
+		} else {
+			validNum3List.add(entity);
+		}
+	}
+
+	private void flushStakeRewardMoney(List<UserMoney> validNum3List, List<UserMoney> validNum5List) {
+		if (CollectionUtil.isNotEmpty(validNum3List)) {
+			bachUpdateMoneyValid3(validNum3List);
+			validNum3List.clear();
+		}
+		if (CollectionUtil.isNotEmpty(validNum5List)) {
+			bachUpdateMoneyValid5(validNum5List);
+			validNum5List.clear();
+		}
+	}
+
+	private int getStakeImmediateRewardSourceType(Integer rewardCoinType) {
+		return Integer.valueOf(ConstantType.user_money_coin_type.type_5).equals(rewardCoinType)
+			? ConstantType.xms_reward_record_source_type.type_27
+			: ConstantType.xms_reward_record_source_type.type_8;
+	}
+
+	private int getStakeLinearRewardSourceType(Integer rewardCoinType) {
+		return Integer.valueOf(ConstantType.user_money_coin_type.type_5).equals(rewardCoinType)
+			? ConstantType.xms_reward_record_source_type.type_28
+			: ConstantType.xms_reward_record_source_type.type_9;
+	}
+
+	private int getStakeImmediateMoneySourceType(Integer rewardCoinType) {
+		return Integer.valueOf(ConstantType.user_money_coin_type.type_5).equals(rewardCoinType)
+			? ConstantType.user_money_log_source_type.type_34
+			: ConstantType.user_money_log_source_type.type_22;
+	}
+
+	private int getStakeLinearMoneySourceType(Integer rewardCoinType) {
+		return Integer.valueOf(ConstantType.user_money_coin_type.type_5).equals(rewardCoinType)
+			? ConstantType.user_money_log_source_type.type_35
+			: ConstantType.user_money_log_source_type.type_23;
+	}
+
+	private void refundDfcStakePrincipal(List<StakeOrder> stakeOrderList) {
+		if (CollectionUtil.isEmpty(stakeOrderList)) {
+			return;
+		}
+		List<RewardRecord> refundRecordList = new ArrayList<>(stakeOrderList.size());
+		for (StakeOrder stakeOrder : stakeOrderList) {
+			BigDecimal stakeAmount = stakeOrder.getStakeAmount() == null ? BigDecimal.ZERO : stakeOrder.getStakeAmount();
+			if (stakeAmount.compareTo(BigDecimal.ZERO) <= 0) {
+				continue;
+			}
+			boolean locked = stakeOrderService.lambdaUpdate()
+				.eq(StakeOrder::getId, stakeOrder.getId())
+				.eq(StakeOrder::getPrincipalRefundStatus, 0)
+				.eq(StakeOrder::getCoinType, ConstantType.user_money_coin_type.type_2)
+				.set(StakeOrder::getPrincipalRefundStatus, 1)
+				.set(StakeOrder::getPrincipalRefundTime, new Date())
+				.update();
+			if (!locked) {
+				continue;
+			}
+			// DFC质押本金到期退回可用DFC(valid_num2)，不进入产出DFC(valid_num5)。
+			int count = userWalletServiceImpl.handerUserMoney(stakeAmount, stakeOrder.getOrderNo(), stakeOrder.getUserId(), stakeOrder.getUserId(),
+				ConstantType.user_money_log_source_type.type_36, ConstantType.user_money_coin_type.type_2);
+			if (count != 1) {
+					throw new ServiceException("DFC stake principal refund failed");
+			}
+			RewardRecord rewardRecord = new RewardRecord();
+			rewardRecord.setOrderCode(IDUtils.getSnowflakeStr());
+			rewardRecord.setUserId(stakeOrder.getUserId());
+			rewardRecord.setAmount(stakeAmount);
+			rewardRecord.setCoinType(ConstantType.user_money_coin_type.type_2);
+			rewardRecord.setSourceType(ConstantType.xms_reward_record_source_type.type_29);
+			rewardRecord.setSourceOrderCode(stakeOrder.getOrderNo());
+			rewardRecord.setSourceUserId(stakeOrder.getUserId());
+			rewardRecord.setCreateTime(new Date());
+			refundRecordList.add(rewardRecord);
+		}
+		if (CollectionUtil.isNotEmpty(refundRecordList)) {
+			rewardRecordService.saveBatch(refundRecordList);
+		}
 	}
 
 
@@ -801,7 +874,7 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 				//钱包流水
 				entity = new UserMoney();
 				entity.setId(packageOrder.getUserId());
-				entity.setValidNum1(userReward);
+				entity.setValidNum5(userReward);
 				entity.setGtId(IDUtils.getSnowflakeStr());
 				entity.setSourceCode(packageOrder.getOrderNo());
 				entity.setSourceId(packageOrder.getUserId());
@@ -1841,7 +1914,7 @@ private void bachUpdateMoneyValid1(List<UserMoney> userMoneyList) {
 			public void setValues(PreparedStatement ps, int i) throws SQLException {
 			ps.setTimestamp(1, new java.sql.Timestamp(userMoneyList.get(i).getUpdateTime().getTime()));
 			ps.setString(2, userMoneyList.get(i).getGtId());
-			ps.setBigDecimal(3, userMoneyList.get(i).getValidNum1());
+			ps.setBigDecimal(3, userMoneyList.get(i).getValidNum5());
 			ps.setString(4, userMoneyList.get(i).getSourceCode());
 			ps.setInt(5, userMoneyList.get(i).getSourceType());
 			ps.setLong(6, userMoneyList.get(i).getSourceId());

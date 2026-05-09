@@ -59,8 +59,16 @@ public class StakeProduct extends BaseEntity {
     @ApiModelProperty(value = "每天产出")
     private BigDecimal dayReward;
 
+    @Excel(name = "立即释放比例")
+    @ApiModelProperty(value = "立即释放比例，百分比；DFC产品可配置，OORT保持默认")
+    private BigDecimal immediateRatio;
+
+    @Excel(name = "线性释放比例")
+    @ApiModelProperty(value = "线性释放比例，百分比；DFC产品可配置，OORT保持默认")
+    private BigDecimal linearRatio;
+
     @Excel(name = "线性释放天数")
-    @ApiModelProperty(value = "线性释放天数")
+    @ApiModelProperty(value = "线性释放天数；DFC产品可配置，OORT保持默认")
     private Integer linearDays;
 
     @Excel(name = "订单有效期")
@@ -92,6 +100,8 @@ public class StakeProduct extends BaseEntity {
             .append("stakeUnitAmount", getStakeUnitAmount())
             .append("extraStakeValueUsdt", getExtraStakeValueUsdt())
             .append("dayReward", getDayReward())
+            .append("immediateRatio", getImmediateRatio())
+            .append("linearRatio", getLinearRatio())
             .append("linearDays", getLinearDays())
             .append("validDays", getValidDays())
             .append("status", getStatus())

@@ -57,6 +57,8 @@ import static com.xms.app.service.impl.BizUserServiceImpl.checkWallet;
 public class BizStakeServiceImpl implements BizStakeService {
 	private static final Integer DEFAULT_STAKE_COIN_TYPE = ConstantType.user_money_coin_type.type_3;
 	private static final Integer DEFAULT_LINEAR_DAYS = 270;
+	private static final BigDecimal DEFAULT_IMMEDIATE_RATIO = new BigDecimal("25");
+	private static final BigDecimal DEFAULT_LINEAR_RATIO = new BigDecimal("75");
 
 	@Autowired
 	private UserInfoService userInfoService;
@@ -197,12 +199,17 @@ public class BizStakeServiceImpl implements BizStakeService {
 
 		// coinType 为空时按旧 OORT 套餐处理；DFC 套餐初始化为 coinType=2、rewardCoinType=5。
 		// DFC 本金下单扣可用 DFC(valid_num2)，每日产出由 rewardCoinType=5 进入产出 DFC(valid_num5)。
+		// 释放比例和线性释放天数按产品配置快照到订单；OORT不在后台页面配置，但可由数据库配置后对新订单生效。
 		Integer productCoinType = defaultStakeCoinType(stakeProduct.getCoinType());
 		Integer rewardCoinType = stakeProduct.getRewardCoinType();
 		BigDecimal bigNum = new BigDecimal(req.getNum());
 		BigDecimal stakeAmount = stakeProduct.getStakeUnitAmount().multiply(bigNum)
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
-		BigDecimal extraStakeValueUsdt = stakeProduct.getExtraStakeValueUsdt();
+		BigDecimal extraStakeValueUsdt = stakeProduct.getExtraStakeValueUsdt() == null ? BigDecimal.ZERO : stakeProduct.getExtraStakeValueUsdt();
+		boolean dfcProduct = productCoinType.equals(ConstantType.user_money_coin_type.type_2);
+		BigDecimal immediateRatio = defaultRatio(stakeProduct.getImmediateRatio(), DEFAULT_IMMEDIATE_RATIO);
+		BigDecimal linearRatio = defaultRatio(stakeProduct.getLinearRatio(), DEFAULT_LINEAR_RATIO);
+		Integer linearDays = stakeProduct.getLinearDays() == null ? DEFAULT_LINEAR_DAYS : stakeProduct.getLinearDays();
 		BigDecimal payAmount = stakeAmount;
 		BigDecimal oortPrice = BigDecimal.ZERO;
 		BigDecimal dfcPrice = BigDecimal.ZERO;
@@ -238,7 +245,7 @@ public class BizStakeServiceImpl implements BizStakeService {
 			.eq(UserMoney::getId, userId)
 			.one();
 		// DFC 质押扣可用 DFC(valid_num2)，并受库存限制；OORT 质押继续扣 OORT(valid_num3)，保证旧业务不变。
-		if (productCoinType.equals(ConstantType.user_money_coin_type.type_2)) {
+		if (dfcProduct) {
 			if (stakeProduct.getAvailableStock() == null || stakeProduct.getAvailableStock() < req.getNum()) {
 				throw new ServiceException(ResponseCode.CODE_1259);
 			}
@@ -253,9 +260,9 @@ public class BizStakeServiceImpl implements BizStakeService {
 		boolean updateProduct = stakeProductService.lambdaUpdate()
 			.eq(StakeProduct::getId, stakeProduct.getId())
 			.setSql("sales = sales + " + req.getNum())
-			.setSql(productCoinType.equals(ConstantType.user_money_coin_type.type_2),
+			.setSql(dfcProduct,
 				"available_stock = available_stock - " + req.getNum())
-			.ge(productCoinType.equals(ConstantType.user_money_coin_type.type_2),
+			.ge(dfcProduct,
 				StakeProduct::getAvailableStock, req.getNum())
 			.update();
 		if (!updateProduct) {
@@ -287,8 +294,10 @@ public class BizStakeServiceImpl implements BizStakeService {
 		stakeOrder.setDfcPriceUsdt(dfcPrice);
 		stakeOrder.setDayReward(stakeProduct.getDayReward().multiply(bigNum)
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew));
-		// 线性天数下单时固化到订单，后续后台改套餐只影响新订单；释放比例在定时任务中固定为25/75。
-		stakeOrder.setLinearDays(stakeProduct.getLinearDays() == null ? DEFAULT_LINEAR_DAYS : stakeProduct.getLinearDays());
+		// 释放比例和线性天数下单时固化到订单，后续后台改套餐只影响新订单。
+		stakeOrder.setImmediateRatio(immediateRatio);
+		stakeOrder.setLinearRatio(linearRatio);
+		stakeOrder.setLinearDays(linearDays);
 		BigDecimal totalYieldTarget = stakeOrder.getDayReward().multiply(new BigDecimal(stakeProduct.getValidDays()))
 			.setScale(ConstantStatic.newScale, ConstantStatic.roundingModeNew);
 		stakeOrder.setTotalYieldTarget(totalYieldTarget);
@@ -314,6 +323,7 @@ public class BizStakeServiceImpl implements BizStakeService {
 			.select(StakeProduct::getId, StakeProduct::getCoinType, StakeProduct::getRewardCoinType,
 				StakeProduct::getSales, StakeProduct::getAvailableStock, StakeProduct::getStakeUnitAmount,
 				StakeProduct::getExtraStakeValueUsdt, StakeProduct::getDayReward,
+				StakeProduct::getImmediateRatio, StakeProduct::getLinearRatio,
 				StakeProduct::getLinearDays, StakeProduct::getValidDays)
 			.one();
 		StakeInfoDTO stakeInfoDTO = new StakeInfoDTO();
@@ -328,6 +338,8 @@ public class BizStakeServiceImpl implements BizStakeService {
 		stakeInfoDTO.setStakeUnitAmount(stakeProduct.getStakeUnitAmount());
 		stakeInfoDTO.setExtraStakeValueUsdt(stakeProduct.getExtraStakeValueUsdt());
 		stakeInfoDTO.setDayReward(stakeProduct.getDayReward());
+		stakeInfoDTO.setImmediateRatio(defaultRatio(stakeProduct.getImmediateRatio(), DEFAULT_IMMEDIATE_RATIO));
+		stakeInfoDTO.setLinearRatio(defaultRatio(stakeProduct.getLinearRatio(), DEFAULT_LINEAR_RATIO));
 		stakeInfoDTO.setLinearDays(stakeProduct.getLinearDays());
 		stakeInfoDTO.setValidDays(stakeProduct.getValidDays());
 		return stakeInfoDTO;
@@ -335,6 +347,10 @@ public class BizStakeServiceImpl implements BizStakeService {
 
 	private Integer defaultStakeCoinType(Integer coinType) {
 		return coinType == null ? DEFAULT_STAKE_COIN_TYPE : coinType;
+	}
+
+	private BigDecimal defaultRatio(BigDecimal ratio, BigDecimal defaultValue) {
+		return ratio == null ? defaultValue : ratio;
 	}
 
 	private Integer rewardCoinTypeByStakeCoin(Integer coinType) {

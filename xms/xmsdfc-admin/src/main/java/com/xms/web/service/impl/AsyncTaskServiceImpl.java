@@ -480,9 +480,13 @@ public class AsyncTaskServiceImpl implements IAsyncTaskService {
 				Integer rewardCoinType = stakeOrder.getRewardCoinType() == null
 					? ConstantType.user_money_coin_type.type_3
 					: stakeOrder.getRewardCoinType();
-				// 当前需求固定为 25% 立即释放、75% 线性释放，不再读取订单上的比例字段。
-				BigDecimal immediateReleasePercent = STAKE_IMMEDIATE_RATIO;
-				BigDecimal linearReleasePercent = STAKE_LINEAR_RATIO;
+				// 质押比例按下单时订单快照执行；OORT不在后台页面配置，但可通过数据库产品配置影响新订单。
+				BigDecimal immediateReleasePercent = stakeOrder.getImmediateRatio() != null
+					? stakeOrder.getImmediateRatio()
+					: STAKE_IMMEDIATE_RATIO;
+				BigDecimal linearReleasePercent = stakeOrder.getLinearRatio() != null
+					? stakeOrder.getLinearRatio()
+					: STAKE_LINEAR_RATIO;
 				Integer linearDays = stakeOrder.getLinearDays() == null || stakeOrder.getLinearDays() <= 0
 					? 270
 					: stakeOrder.getLinearDays();

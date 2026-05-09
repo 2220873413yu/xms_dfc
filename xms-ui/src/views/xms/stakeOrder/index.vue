@@ -58,6 +58,9 @@
         </template>
       </el-table-column>
       <el-table-column align="center" label="每日产出" prop="dayReward" width="110" />
+      <el-table-column align="center" label="立即释放%" prop="immediateRatio" width="100" />
+      <el-table-column align="center" label="线性释放%" prop="linearRatio" width="100" />
+      <el-table-column align="center" label="线性天数" prop="linearDays" width="100" />
       <el-table-column align="center" label="理论总产出" prop="totalYieldTarget" width="120" />
       <el-table-column align="center" label="已产出" prop="yieldedAmount" width="110" />
       <el-table-column align="center" label="订单状态" prop="status">

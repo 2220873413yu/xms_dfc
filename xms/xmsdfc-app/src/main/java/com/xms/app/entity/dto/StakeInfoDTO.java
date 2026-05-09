@@ -29,6 +29,11 @@ public class StakeInfoDTO {
 	private BigDecimal extraStakeValueUsdt;
 	/** 每天产出 */
 	private BigDecimal dayReward;
+	/** 立即释放比例，百分比 */
+	private BigDecimal immediateRatio;
+	/** 线性释放比例，百分比 */
+	private BigDecimal linearRatio;
+	/** 线性释放天数 */
 	private Integer linearDays;
 	/** 订单有效期(天)，如360 */
 	private Integer validDays;

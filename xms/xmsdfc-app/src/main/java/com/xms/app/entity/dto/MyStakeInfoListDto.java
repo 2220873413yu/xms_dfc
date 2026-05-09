@@ -29,11 +29,16 @@ public class MyStakeInfoListDto {
 	 */
 	private BigDecimal stakeOortAmount;
 
-	/** 已产出OORT(累计) */
+	/** 已产出(累计)，按订单产出币种展示 */
 	private BigDecimal yieldedAmount;
 
-	/** 每日产出OORT=product.day_reward*quantity */
+	/** 每日产出=product.day_reward*quantity */
 	private BigDecimal dayReward;
+	/** 立即释放比例快照，百分比 */
+	private BigDecimal immediateRatio;
+	/** 线性释放比例快照，百分比 */
+	private BigDecimal linearRatio;
+	/** 线性释放天数快照 */
 	private Integer linearDays;
 
 	/** 剩余有效期天数 */

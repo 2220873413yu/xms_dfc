@@ -80,35 +80,43 @@ public class StakeOrder extends BaseEntity {
     @ApiModelProperty(value = "每日产出=product.day_reward*quantity")
     private BigDecimal dayReward;
 
-    @Excel(name = "线性释放天数", sort = 14)
+    @Excel(name = "立即释放比例", sort = 14)
+    @ApiModelProperty(value = "立即释放比例快照，百分比")
+    private BigDecimal immediateRatio;
+
+    @Excel(name = "线性释放比例", sort = 15)
+    @ApiModelProperty(value = "线性释放比例快照，百分比")
+    private BigDecimal linearRatio;
+
+    @Excel(name = "线性释放天数", sort = 16)
     @ApiModelProperty(value = "线性释放天数")
     private Integer linearDays;
 
-    @Excel(name = "理论总产出", sort = 15)
+    @Excel(name = "理论总产出", sort = 17)
     @ApiModelProperty(value = "理论总产出=day_reward*valid_days")
     private BigDecimal totalYieldTarget;
 
-    @Excel(name = "已产出", sort = 16)
+    @Excel(name = "已产出", sort = 18)
     @ApiModelProperty(value = "已产出")
     private BigDecimal yieldedAmount;
 
-    @Excel(name = "订单状态", sort = 17, dictType = "t_stake_order_status")
+    @Excel(name = "订单状态", sort = 19, dictType = "t_stake_order_status")
     @ApiModelProperty(value = "状态 0:产出中 1:已到期 2:暂停 3:取消")
     private Integer status;
 
-    @Excel(name = "本金退还状态", sort = 18, dictType = "biz_principal_refund_status")
+    @Excel(name = "本金退还状态", sort = 20, dictType = "biz_principal_refund_status")
     @ApiModelProperty(value = "本金退还状态 0:未退还 1:已退还")
     private Integer principalRefundStatus;
 
-    @Excel(name = "本金退还时间", sort = 19, width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "本金退还时间", sort = 21, width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty(value = "本金退还时间")
     private Date principalRefundTime;
 
-    @Excel(name = "有效期", sort = 20)
+    @Excel(name = "有效期", sort = 22)
     @ApiModelProperty(value = "有效期天数")
     private Integer validDays;
 
-    @Excel(name = "剩余有效期", sort = 21)
+    @Excel(name = "剩余有效期", sort = 23)
     @ApiModelProperty(value = "剩余有效期天数")
     private Integer haveDays;
 
@@ -138,6 +146,9 @@ public class StakeOrder extends BaseEntity {
             .append("dfcPriceUsdt", getDfcPriceUsdt())
             .append("extraStakeOortAmount", getExtraStakeOortAmount())
             .append("dayReward", getDayReward())
+            .append("immediateRatio", getImmediateRatio())
+            .append("linearRatio", getLinearRatio())
+            .append("linearDays", getLinearDays())
             .append("totalYieldTarget", getTotalYieldTarget())
             .append("yieldedAmount", getYieldedAmount())
             .append("status", getStatus())

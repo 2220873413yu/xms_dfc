@@ -19,6 +19,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="dfcPriceUsdt"    column="dfc_price_usdt"    />
         <result property="extraStakeOortAmount"    column="extra_stake_oort_amount"    />
         <result property="dayReward"    column="day_reward"    />
+        <result property="immediateRatio"    column="immediate_ratio"    />
+        <result property="linearRatio"    column="linear_ratio"    />
         <result property="linearDays"    column="linear_days"    />
         <result property="totalYieldTarget"    column="total_yield_target"    />
         <result property="yieldedAmount"    column="yielded_amount"    />
@@ -35,7 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <sql id="selectStakeOrderVo">
         select remark, id, user_id, product_id, coin_type, reward_coin_type, order_no, quantity, stake_amount,
                stake_oort_amount, extra_value_usdt, oort_price_usdt, dfc_price_usdt, extra_stake_oort_amount, day_reward,
-               linear_days, total_yield_target, yielded_amount, status,
+               immediate_ratio, linear_ratio, linear_days, total_yield_target, yielded_amount, status,
                principal_refund_status, principal_refund_time, valid_days, have_days, create_time, update_time
         from t_stake_order
     </sql>
@@ -57,6 +59,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="dfcPriceUsdt != null "> and dfc_price_usdt = #{dfcPriceUsdt}</if>
             <if test="extraStakeOortAmount != null "> and extra_stake_oort_amount = #{extraStakeOortAmount}</if>
             <if test="dayReward != null "> and day_reward = #{dayReward}</if>
+            <if test="immediateRatio != null "> and immediate_ratio = #{immediateRatio}</if>
+            <if test="linearRatio != null "> and linear_ratio = #{linearRatio}</if>
             <if test="linearDays != null "> and linear_days = #{linearDays}</if>
             <if test="totalYieldTarget != null "> and total_yield_target = #{totalYieldTarget}</if>
             <if test="yieldedAmount != null "> and yielded_amount = #{yieldedAmount}</if>

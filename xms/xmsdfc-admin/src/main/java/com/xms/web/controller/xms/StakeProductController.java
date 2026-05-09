@@ -79,6 +79,12 @@ public class StakeProductController extends BaseController {
         // 质押币种和产出币种只由初始化数据确定，后台编辑时不允许通过请求体变更，避免产出进错钱包字段。
         stakeProduct.setCoinType(dbProduct.getCoinType());
         stakeProduct.setRewardCoinType(dbProduct.getRewardCoinType());
+        // OORT产品可通过数据库维护释放配置，但后台页面不开放编辑；页面保存其他字段时保留数据库原值。
+        if (!Integer.valueOf(ConstantType.user_money_coin_type.type_2).equals(dbProduct.getCoinType())) {
+            stakeProduct.setImmediateRatio(dbProduct.getImmediateRatio());
+            stakeProduct.setLinearRatio(dbProduct.getLinearRatio());
+            stakeProduct.setLinearDays(dbProduct.getLinearDays());
+        }
         validateStakeProduct(stakeProduct);
         return toAjax(stakeProductService.updateById(stakeProduct));
     }
@@ -98,6 +104,14 @@ public class StakeProductController extends BaseController {
         if (stakeProduct.getRewardCoinType() == null) {
             stakeProduct.setRewardCoinType(dfcProduct ? ConstantType.user_money_coin_type.type_5 : ConstantType.user_money_coin_type.type_3);
         }
+        if (!dfcProduct) {
+            if (stakeProduct.getImmediateRatio() == null) {
+                stakeProduct.setImmediateRatio(new BigDecimal("25"));
+            }
+            if (stakeProduct.getLinearRatio() == null) {
+                stakeProduct.setLinearRatio(new BigDecimal("75"));
+            }
+        }
         if (stakeProduct.getLinearDays() == null || stakeProduct.getLinearDays() <= 0) {
             stakeProduct.setLinearDays(dfcProduct ? 365 : 270);
         }
@@ -116,6 +130,15 @@ public class StakeProductController extends BaseController {
         if (dfcProduct) {
             if (stakeProduct.getAvailableStock() == null || stakeProduct.getAvailableStock() < 0) {
                 throw new SecurityException("DFC stake stock must not be empty or negative");
+            }
+            if (stakeProduct.getImmediateRatio() == null || stakeProduct.getImmediateRatio().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new SecurityException("DFC immediate release ratio must be greater than 0");
+            }
+            if (stakeProduct.getLinearRatio() == null || stakeProduct.getLinearRatio().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new SecurityException("DFC linear release ratio must be greater than 0");
+            }
+            if (stakeProduct.getImmediateRatio().add(stakeProduct.getLinearRatio()).compareTo(new BigDecimal("100")) > 0) {
+                throw new SecurityException("DFC release ratio sum must not exceed 100");
             }
         } else if (stakeProduct.getExtraStakeValueUsdt().compareTo(BigDecimal.ZERO) <= 0) {
             throw new SecurityException("OORT extra stake value must be greater than 0");

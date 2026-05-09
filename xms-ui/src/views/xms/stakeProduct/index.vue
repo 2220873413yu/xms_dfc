@@ -28,11 +28,19 @@
           <dict-tag :options="dict.type.biz_stake_coin_type" :value="scope.row.coinType" />
         </template>
       </el-table-column>
+      <el-table-column align="center" label="产出币种" prop="rewardCoinType" width="100">
+        <template slot-scope="scope">
+          <dict-tag :options="dict.type.biz_stake_reward_coin_type" :value="scope.row.rewardCoinType" />
+        </template>
+      </el-table-column>
       <el-table-column align="center" label="销量" prop="sales" />
       <el-table-column align="center" label="可用库存" prop="availableStock" />
       <el-table-column align="center" label="质押数量" prop="stakeUnitAmount" />
       <el-table-column align="center" label="额外质押USDT" prop="extraStakeValueUsdt" width="130" />
       <el-table-column align="center" label="每天产出" prop="dayReward" />
+      <el-table-column align="center" label="立即释放%" prop="immediateRatio" width="100" />
+      <el-table-column align="center" label="线性释放%" prop="linearRatio" width="100" />
+      <el-table-column align="center" label="线性天数" prop="linearDays" width="90" />
       <el-table-column align="center" label="订单有效期" prop="validDays" />
       <el-table-column align="center" label="是否上架" prop="status">
         <template slot-scope="scope">
@@ -67,6 +75,15 @@
         <el-form-item label="每天产出" prop="dayReward">
           <el-input v-model="form.dayReward" @input="value => handleDecimalInput('dayReward', value)" />
         </el-form-item>
+        <el-form-item v-if="isDfcProduct" label="立即释放%" prop="immediateRatio">
+          <el-input v-model="form.immediateRatio" @input="value => handleDecimalInput('immediateRatio', value)" />
+        </el-form-item>
+        <el-form-item v-if="isDfcProduct" label="线性释放%" prop="linearRatio">
+          <el-input v-model="form.linearRatio" @input="value => handleDecimalInput('linearRatio', value)" />
+        </el-form-item>
+        <el-form-item v-if="isDfcProduct" label="线性天数" prop="linearDays">
+          <el-input-number v-model="form.linearDays" :min="1" controls-position="right" />
+        </el-form-item>
         <el-form-item label="订单有效期" prop="validDays">
           <el-input-number v-model="form.validDays" :disabled="true" :min="1" controls-position="right" />
         </el-form-item>
@@ -89,7 +106,7 @@ import { listStakeProduct, getStakeProduct, updateStakeProduct } from '@/api/xms
 
 export default {
   name: 'StakeProduct',
-  dicts: ['t_user_info_is_valid', 'biz_stake_coin_type'],
+  dicts: ['t_user_info_is_valid', 'biz_stake_coin_type', 'biz_stake_reward_coin_type'],
   data() {
     return {
       loading: true,
@@ -110,6 +127,9 @@ export default {
         extraStakeValueUsdt: [{ required: true, message: '请输入额外质押USDT', trigger: 'blur' }],
         availableStock: [{ required: true, message: '请输入可用库存', trigger: 'blur' }],
         dayReward: [{ required: true, message: '请输入每天产出', trigger: 'blur' }],
+        immediateRatio: [{ required: true, message: '请输入立即释放比例', trigger: 'blur' }],
+        linearRatio: [{ required: true, message: '请输入线性释放比例', trigger: 'blur' }],
+        linearDays: [{ required: true, message: '请输入线性释放天数', trigger: 'blur' }],
         validDays: [{ required: true, message: '请输入订单有效期', trigger: 'blur' }],
         status: [{ required: true, message: '请选择是否上架', trigger: 'change' }]
       }
@@ -157,6 +177,8 @@ export default {
         stakeUnitAmount: null,
         extraStakeValueUsdt: '0',
         dayReward: null,
+        immediateRatio: '25',
+        linearRatio: '75',
         linearDays: 270,
         validDays: null,
         status: 1
@@ -184,6 +206,14 @@ export default {
         if (!valid) return
         if (this.isDfcProduct && (this.form.availableStock === null || this.form.availableStock === undefined || this.form.availableStock === '')) {
           this.$modal.msgError('请输入可用库存')
+          return
+        }
+        if (this.isDfcProduct && (Number(this.form.immediateRatio) <= 0 || Number(this.form.linearRatio) <= 0)) {
+          this.$modal.msgError('释放比例必须大于0')
+          return
+        }
+        if (this.isDfcProduct && Number(this.form.immediateRatio) + Number(this.form.linearRatio) > 100) {
+          this.$modal.msgError('释放比例之和不能超过100')
           return
         }
         updateStakeProduct(this.form).then(() => {

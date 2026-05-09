@@ -14,6 +14,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="stakeUnitAmount"    column="stake_unit_amount"    />
         <result property="extraStakeValueUsdt"    column="extra_stake_value_usdt"    />
         <result property="dayReward"    column="day_reward"    />
+        <result property="immediateRatio"    column="immediate_ratio"    />
+        <result property="linearRatio"    column="linear_ratio"    />
         <result property="linearDays"    column="linear_days"    />
         <result property="validDays"    column="valid_days"    />
         <result property="status"    column="status"    />
@@ -24,7 +26,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectStakeProductVo">
         select id, name, coin_type, reward_coin_type, sales, available_stock, stake_unit_amount, extra_stake_value_usdt,
-               day_reward, linear_days, valid_days, status, create_time, update_time, remark
+               day_reward, immediate_ratio, linear_ratio, linear_days, valid_days, status, create_time, update_time, remark
         from t_stake_product
     </sql>
 
@@ -40,6 +42,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="stakeUnitAmount != null "> and stake_unit_amount = #{stakeUnitAmount}</if>
             <if test="extraStakeValueUsdt != null "> and extra_stake_value_usdt = #{extraStakeValueUsdt}</if>
             <if test="dayReward != null "> and day_reward = #{dayReward}</if>
+            <if test="immediateRatio != null "> and immediate_ratio = #{immediateRatio}</if>
+            <if test="linearRatio != null "> and linear_ratio = #{linearRatio}</if>
             <if test="linearDays != null "> and linear_days = #{linearDays}</if>
             <if test="validDays != null "> and valid_days = #{validDays}</if>
             <if test="status != null "> and status = #{status}</if>

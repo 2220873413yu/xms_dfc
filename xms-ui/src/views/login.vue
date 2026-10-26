@@ -1,11 +1,11 @@
 <template>
   <div class="login">
-    <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form">
+    <el-form ref="loginForm" :model="loginForm" :rules="loginRules" autocomplete="on" class="login-form">
       <h3 class="title">dfc矿机管理后台</h3>
       <el-form-item prop="username">
         <el-input
           v-model="loginForm.username"
-          auto-complete="off"
+          autocomplete="username"
           placeholder="账号"
           type="text"
         >
@@ -15,7 +15,7 @@
       <el-form-item prop="password">
         <el-input
           v-model="loginForm.password"
-          auto-complete="off"
+          autocomplete="current-password"
           placeholder="密码"
           type="password"
           @keyup.enter.native="handleLogin"
@@ -26,7 +26,7 @@
       <el-form-item prop="googleCode">
         <el-input
           v-model="loginForm.googleCode"
-          auto-complete="off"
+          autocomplete="off"
           placeholder="谷歌验证码"
           type="text">
           <svg-icon slot="prefix" class="el-input__icon input-icon" icon-class="validCode" />
@@ -35,7 +35,7 @@
       <el-form-item v-if="captchaEnabled" prop="code">
         <el-input
           v-model="loginForm.code"
-          auto-complete="off"
+          autocomplete="off"
           placeholder="验证码"
           style="width: 63%"
           @keyup.enter.native="handleLogin"
@@ -71,184 +71,193 @@
 </template>
 
 <script>
-  import { getCodeImg} from "@/api/login";
-  import Cookies from "js-cookie";
-  import { encrypt, decrypt } from '@/utils/jsencrypt'
+import { getCodeImg} from "@/api/login";
+import Cookies from "js-cookie";
+import { encrypt, decrypt } from '@/utils/jsencrypt'
 
-  export default {
-    name: "Login",
-    data() {
-      return {
-        codeUrl: "",
-        loginForm: {
-          username: "",
-          password: "",
-          googleCode: "",
-          rememberMe: false,
-          code: "",
-          uuid: ""
-        },
-        loginRules: {
-          username: [
-            { required: true, trigger: "blur", message: "请输入您的账号" }
-          ],
-          googleCode: [
-            { required: true, trigger: "blur", message: "请输入您的谷歌验证码" }
-          ],
-          password: [
-            { required: true, trigger: "blur", message: "请输入您的密码" }
-          ],
-          code: [{ required: true, trigger: "change", message: "请输入验证码" }]
-        },
-        loading: false,
-        // 验证码开关
-        captchaEnabled: true,
-        // 注册开关
-        register: false,
-        redirect: undefined,
-        intervalId: null
+export default {
+  name: "Login",
+  data() {
+    return {
+      codeUrl: "",
+      loginForm: {
+        username: "",
+        password: "",
+        googleCode: "",
+        rememberMe: false,
+        code: "",
+        uuid: ""
+      },
+      loginRules: {
+        username: [
+          { required: true, trigger: "blur", message: "请输入您的账号" }
+        ],
+        googleCode: [
+          { required: true, trigger: "blur", message: "请输入您的谷歌验证码" }
+        ],
+        password: [
+          { required: true, trigger: "blur", message: "请输入您的密码" }
+        ],
+        code: [{ required: true, trigger: "change", message: "请输入验证码" }]
+      },
+      loading: false,
+      // 验证码开关
+      captchaEnabled: true,
+      // 注册开关
+      register: false,
+      redirect: undefined,
+      intervalId: null
+    };
+  },
+  watch: {
+    $route: {
+      handler: function(route) {
+        this.redirect = route.query && route.query.redirect;
+      },
+      immediate: true
+    }
+  },
+  created() {
+    this.getCode();
+    this.getCookie();
+  },
+  methods: {
+    getCode() {
+      getCodeImg().then(res => {
+        this.captchaEnabled = res.captchaEnabled === undefined ? true : res.captchaEnabled;
+        if (this.captchaEnabled) {
+          this.codeUrl = res.img;
+          this.loginForm.uuid = res.uuid;
+        }
+      });
+    },
+    getCookie() {
+      const username = Cookies.get("username");
+      const password = Cookies.get("password");
+      const rememberMe = Cookies.get('rememberMe');
+      const email = this.loginForm.email;
+      const emailCode = this.loginForm.emailCode;
+      const googleCode = this.loginForm.googleCode;
+
+      this.loginForm = {
+        username: username === undefined ? this.loginForm.username : username,
+        password: password === undefined ? this.loginForm.password : decrypt(password),
+        rememberMe: rememberMe === undefined ? false : Boolean(rememberMe),
+        email: email,
+        emailCode: emailCode,
+        googleCode: googleCode,
+        code: "",
+        uuid: ""
       };
     },
-    watch: {
-      $route: {
-        handler: function(route) {
-          this.redirect = route.query && route.query.redirect;
-        },
-        immediate: true
+    handleLogin() {
+      if (this.loading) {
+        return;
+      }
+      this.$refs.loginForm.validate(valid => {
+        if (valid) {
+          this.loading = true;
+          const loginData = {
+            ...this.loginForm
+          };
+
+          this.$store.dispatch("Login", loginData).then(() => {
+            this.updateRememberedCredentials();
+            this.$router.push({ path: this.redirect || "/" }).catch(()=>{});
+          }).catch(error => {
+            this.loading = false;
+            this.clearFailedLoginFields(error);
+            if (this.captchaEnabled) {
+              this.getCode();
+            }
+          });
+        }
+      });
+    },
+    updateRememberedCredentials() {
+      if (this.loginForm.rememberMe) {
+        Cookies.set("username", this.loginForm.username, { expires: 30 });
+        Cookies.set("password", encrypt(this.loginForm.password), { expires: 30 });
+        Cookies.set("rememberMe", true, { expires: 30 });
+      } else {
+        Cookies.remove("username");
+        Cookies.remove("password");
+        Cookies.remove("rememberMe");
       }
     },
-    created() {
-      this.getCode();
-      this.getCookie();
-    },
-    methods: {
-      getCode() {
-        getCodeImg().then(res => {
-          this.captchaEnabled = res.captchaEnabled === undefined ? true : res.captchaEnabled;
-          if (this.captchaEnabled) {
-            this.codeUrl = res.img;
-            this.loginForm.uuid = res.uuid;
-          }
-        });
-      },
-      getCookie() {
-        const username = Cookies.get("username");
-        const password = Cookies.get("password");
-        const rememberMe = Cookies.get('rememberMe');
-        const email = this.loginForm.email;
-        const emailCode = this.loginForm.emailCode;
-        const googleCode = this.loginForm.googleCode;
-
-        this.loginForm = {
-          username: username === undefined ? this.loginForm.username : username,
-          password: password === undefined ? this.loginForm.password : decrypt(password),
-          rememberMe: rememberMe === undefined ? false : Boolean(rememberMe),
-          email: email,
-          emailCode: emailCode,
-          googleCode: googleCode,
-          code: "",
-          uuid: ""
-        };
-      },
-      handleLogin() {
-        this.$refs.loginForm.validate(valid => {
-          if (valid) {
-            this.loading = true;
-            if (this.loginForm.rememberMe) {
-              Cookies.set("username", this.loginForm.username, { expires: 30 });
-              Cookies.set("password", encrypt(this.loginForm.password), { expires: 30 });
-              Cookies.set('rememberMe', this.loginForm.rememberMe, { expires: 30 });
-            } else {
-              Cookies.remove("username");
-              Cookies.remove("password");
-              Cookies.remove('rememberMe');
-            }
-            // 将邮箱和邮箱验证码添加到登录请求中
-            const loginData = {
-              ...this.loginForm,
-              // 如果后端需要特定的字段名，可以在这里进行映射
-              // email: this.loginForm.email,
-              // emailCode: this.loginForm.emailCode
-            };
-            console.log(loginData);
-
-            this.$store.dispatch("Login", loginData).then(() => {
-              this.$router.push({ path: this.redirect || "/" }).catch(()=>{});
-            }).catch(() => {
-              this.loading = false;
-              if (this.captchaEnabled) {
-                this.getCode();
-              }
-            });
-          }
-        });
-      },
+    clearFailedLoginFields(error) {
+      if (!error || !error.isAxiosError) {
+        this.loginForm.password = "";
+      }
+      this.loginForm.googleCode = "";
+      this.loginForm.code = "";
     }
-  };
+  }
+};
 </script>
 
 <style lang="scss" rel="stylesheet/scss">
-  .login {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
-    background-image: url("../assets/images/login-background.jpg");
-    background-size: cover;
-  }
-  .title {
-    margin: 0px auto 30px auto;
-    text-align: center;
-    color: #707070;
-  }
+.login {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  background-image: url("../assets/images/login-background.jpg");
+  background-size: cover;
+}
+.title {
+  margin: 0px auto 30px auto;
+  text-align: center;
+  color: #707070;
+}
 
-  .login-form {
-    border-radius: 6px;
-    background: #ffffff;
-    width: 400px;
-    padding: 25px 25px 5px 25px;
-    .el-input {
-      height: 38px;
-      input {
-        height: 38px;
-      }
-    }
-    .input-icon {
-      height: 39px;
-      width: 14px;
-      margin-left: 2px;
-    }
-  }
-  .login-tip {
-    font-size: 13px;
-    text-align: center;
-    color: #bfbfbf;
-  }
-  .login-code {
-    width: 33%;
+.login-form {
+  border-radius: 6px;
+  background: #ffffff;
+  width: 400px;
+  padding: 25px 25px 5px 25px;
+  .el-input {
     height: 38px;
-    float: right;
-    .login-code-img {
+    input {
       height: 38px;
-      cursor: pointer;
-    }
-    .el-button {
-      width: 100%;
-      height: 38px;
-      padding: 0;
-      font-size: 12px;
     }
   }
-  .el-login-footer {
-    height: 40px;
-    line-height: 40px;
-    position: fixed;
-    bottom: 0;
+  .input-icon {
+    height: 39px;
+    width: 14px;
+    margin-left: 2px;
+  }
+}
+.login-tip {
+  font-size: 13px;
+  text-align: center;
+  color: #bfbfbf;
+}
+.login-code {
+  width: 33%;
+  height: 38px;
+  float: right;
+  .login-code-img {
+    height: 38px;
+    cursor: pointer;
+  }
+  .el-button {
     width: 100%;
-    text-align: center;
-    color: #fff;
-    font-family: Arial;
+    height: 38px;
+    padding: 0;
     font-size: 12px;
-    letter-spacing: 1px;
   }
+}
+.el-login-footer {
+  height: 40px;
+  line-height: 40px;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  text-align: center;
+  color: #fff;
+  font-family: Arial;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
 </style>

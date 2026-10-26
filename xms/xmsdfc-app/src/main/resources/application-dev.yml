@@ -257,7 +257,7 @@ lq:
 # df资产划转md5key
 df:
   md5Key: "-s_%5+wK#Ym@5+PiAAAAnMoNITII"
-  callDfcUrl: "https://api-spot.weex.com/api/v2/market/ticker?symbol=DFCUSDT_SPBL"
+  callDfcUrl: "https://api-spot.weex.com/api/v3/market/ticker?symbol=DFCUSDT_SPBL"
 juExchange:
   appId: xd0xee8d78245cdn
   appSecret: d161ev4r35gghrs3h421ifk2acpwtwkbg2w3cslr332l65s31c8ykf2olbitbw0w

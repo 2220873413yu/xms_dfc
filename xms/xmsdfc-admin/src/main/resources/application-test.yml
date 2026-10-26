@@ -203,7 +203,7 @@ lq:
 
 df:
   #获取oort价格url
-  callDfcUrl: "http://39.109.116.226:40800/api/v2/market/ticker?symbol=DFCUSDT_SPBL"
+  callDfcUrl: "http://39.109.116.226:40800/api/v3/market/ticker?symbol=DFCUSDT_SPBL"
 
 juExchange:
   appId: xd0xee8d78245cdn

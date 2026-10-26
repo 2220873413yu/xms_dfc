@@ -108,8 +108,8 @@ public class BizCommonServiceImpl implements BizCommonService {
 				return cachedPrice;
 			}
 			try {
-				//HttpRequest request = HttpUtil.createGet("https://api-spot.weex.com/api/v2/market/ticker?symbol=DFCUSDT_SPBL")
-				//HttpRequest request = HttpUtil.createGet("http://39.109.116.226:40800/api/v2/market/ticker?symbol=DFCUSDT_SPBL")
+				//HttpRequest request = HttpUtil.createGet("https://api-spot.weex.com/api/v3/market/ticker?symbol=DFCUSDT_SPBL")
+				//HttpRequest request = HttpUtil.createGet("http://39.109.116.226:40800/api/v3/market/ticker?symbol=DFCUSDT_SPBL")
 				HttpRequest request = HttpUtil.createGet(callDfcUrl)
 					//.setProxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", 7897)))
 					.timeout(5000);

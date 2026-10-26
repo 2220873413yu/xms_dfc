@@ -205,7 +205,7 @@ lq:
 
 df:
   #获取oort价格url
-  callDfcUrl: "https://api-spot.weex.com/api/v2/market/ticker?symbol=DFCUSDT_SPBL"
+  callDfcUrl: "https://api-spot.weex.com/api/v3/market/ticker?symbol=DFCUSDT_SPBL"
 
 juExchange:
   appId: xd0xee8d78245cdn
